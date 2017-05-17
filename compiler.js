@@ -119,13 +119,29 @@ Compiler.prototype.pass1 = function (program) {
     return node;
   }
 
-  var abstractSyntaxTree = buildAbstractSyntaxTree(outputQueue);
-  console.log(JSON.stringify(abstractSyntaxTree));
   return buildAbstractSyntaxTree(outputQueue);
 };
 
 Compiler.prototype.pass2 = function (ast) {
-  // return AST with constant expressions reduced
+  function reduceTree (ast) {
+    if (ast.op === 'imm' || ast.op === 'arg') {
+      return ast;
+    }
+    ast.a = reduceTree(ast.a);
+    ast.b = reduceTree(ast.b);
+    
+    if (ast.a.op === 'imm' && ast.b.op === 'imm') {
+      var n = eval('' + ast.a.n + ast.op + ast.b.n);
+      return {
+        op: 'imm',
+        n: n
+      }
+    }
+    
+    return ast;
+  }
+  
+  return reduceTree(ast);
 };
 
 Compiler.prototype.pass3 = function (ast) {
