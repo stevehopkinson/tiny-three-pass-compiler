@@ -1,3 +1,11 @@
+function isNumber (token) {
+  return !isNaN(token);
+}
+
+function isOperator (token) {
+  return "*/+-".indexOf(token) !== -1;
+}
+
 function Compiler () {};
 
 Compiler.prototype.compile = function (program) {
@@ -31,14 +39,6 @@ Compiler.prototype.pass1 = function (program) {
       '-' : 1,
     }
     return precedences[o1] <= precedences[o2];
-  }
-
-  function isNumber (token) {
-    return !isNaN(token);
-  }
-
-  function isOperator (token) {
-    return "*/+-".indexOf(token) !== -1;
   }
 
   var token;
@@ -96,7 +96,7 @@ Compiler.prototype.pass1 = function (program) {
     output = outputQueue.pop();
   }
 
-  function buildAbstractSyntaxTree (outputQueue) {
+  function buildAst (outputQueue) {
     getNextOutput();
     var node = {};
 
@@ -110,8 +110,8 @@ Compiler.prototype.pass1 = function (program) {
     }
     else if (isOperator(output)) {
       node.op = output;
-      var b = buildAbstractSyntaxTree(outputQueue);
-      var a = buildAbstractSyntaxTree(outputQueue);
+      var b = buildAst(outputQueue);
+      var a = buildAst(outputQueue);
       node.a = a;
       node.b = b;
     }
@@ -119,7 +119,7 @@ Compiler.prototype.pass1 = function (program) {
     return node;
   }
 
-  return buildAbstractSyntaxTree(outputQueue);
+  return buildAst(outputQueue);
 };
 
 Compiler.prototype.pass2 = function (ast) {
@@ -145,7 +145,67 @@ Compiler.prototype.pass2 = function (ast) {
 };
 
 Compiler.prototype.pass3 = function (ast) {
-  // return assembly instructions
+  var operatorMap = {
+    '+' : 'AD',
+    '-' : 'SU',
+    '*' : 'MU',
+    '/' : 'DI',
+  }
+
+  var operationDepths = {};
+  var maxDepth = -Infinity;
+
+  function markDepth (ast, depth = 0) 
+  {
+    if (ast.a && ast.b) {
+      maxDepth = Math.max(maxDepth, depth);
+      if (!operationDepths[depth]) {
+        operationDepths[depth] = [];
+      }
+      operationDepths[depth].push(ast);
+      markDepth(ast.a, depth + 1);
+      markDepth(ast.b, depth + 1);
+    }
+  }
+
+  markDepth(ast);
+  var asm = [];
+
+  var currentDepth = maxDepth;
+  while (currentDepth >= 0) {
+    currentDepthOperations = operationDepths[currentDepth];
+    while (currentDepthOperations.length) {
+      var currentOperation = currentDepthOperations.shift();
+
+      // Handle right branch
+      if (currentOperation.b.op === 'imm') {
+        asm.push('IM ' + currentOperation.b.n);
+      } else if (currentOperation.b.op === 'arg') {
+        asm.push('AR ' + currentOperation.b.n);
+      } else {
+        asm.push('PO');
+      }
+
+      asm.push('SW');
+
+      // Handle left branch
+      if (currentOperation.a.op === 'imm') {
+        asm.push('IM ' + currentOperation.a.n);
+      } else if (currentOperation.a.op === 'arg') {
+        asm.push('AR ' + currentOperation.a.n);
+      } else {
+        asm.push('PO');
+      }
+
+      // Apply operation
+      asm.push(operatorMap[currentOperation.op]);
+
+      // Push result to stack
+      asm.push('PU');
+    }
+    currentDepth--;
+  }
+  return asm;
 };
 
 module.exports = Compiler;
