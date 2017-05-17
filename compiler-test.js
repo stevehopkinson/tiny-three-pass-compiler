@@ -9,4 +9,6 @@ var t2 = JSON.stringify({"op":"/","a":{"op":"-","a":{"op":"+","a":{"op":"*","a":
 var c = new Compiler();
 
 var p1 = c.pass1(prog);
-console.log(JSON.stringify(p1) === t1 ? 'Pass 1 output matches expected.' : 'Pass 1 output doesn\'t match.');
+
+var p2 = c.pass2(p1);
+console.log(p2);
